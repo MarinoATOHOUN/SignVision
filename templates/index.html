@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <header class="mb-10 text-center">
+        <div class="flex justify-center items-center mb-4">
+            <i class="fas fa-hands-helping text-4xl text-blue-500 mr-3"></i>
+            <h1 class="text-4xl font-bold text-gray-800">SignVision AI</h1>
+        </div>
+        <p class="text-xl text-gray-600 mb-2">Détection avancée de langage des signes en temps réel</p>
+        <p class="text-sm text-gray-500">Projet créé par <span class="font-semibold text-blue-600">Marino ATOHOUN</span></p>
+    </header>
+
+    <!-- Messages Django -->
+    {% if messages %}
+        <div class="mb-6">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- Main Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Input Section -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                <i class="fas fa-upload mr-2 text-blue-500"></i> Source d'entrée
+            </h2>
+            
+            <div class="space-y-6">
+                <!-- Camera Input -->
+                <div class="space-y-3">
+                    <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                        <i class="fas fa-video mr-2 text-blue-400"></i> Caméra en direct
+                    </h3>
+                    <div class="video-container" id="cameraContainer">
+                        <video id="liveCamera" autoplay playsinline class="hidden"></video>
+                        <canvas id="cameraCanvas" class="hidden"></canvas>
+                        <div class="absolute inset-0 flex items-center justify-center text-white bg-gray-800">
+                            <i class="fas fa-camera text-4xl opacity-50"></i>
+                        </div>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button id="startCamera" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-play mr-2"></i> Activer la caméra
+                        </button>
+                        <button id="stopCamera" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg flex items-center justify-center" disabled>
+                            <i class="fas fa-stop mr-2"></i> Désactiver
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- File Upload -->
+                <div class="space-y-3">
+                    <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                        <i class="fas fa-file-upload mr-2 text-blue-400"></i> Fichier média
+                    </h3>
+                    <form id="uploadForm" method="post" enctype="multipart/form-data" action="{% url 'upload_file' %}">
+                        {% csrf_token %}
+                        <label for="mediaUpload" class="file-upload-label block cursor-pointer">
+                            <div class="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50 hover:bg-blue-100">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-blue-400 mb-3"></i>
+                                <p class="text-gray-700 font-medium">Glissez-déposez une vidéo ou une image</p>
+                                <p class="text-gray-500 text-sm mt-1">ou cliquez pour sélectionner un fichier</p>
+                                <p class="text-gray-400 text-xs mt-2">Formats supportés: MP4, AVI, MOV, PNG, JPG</p>
+                            </div>
+                            <input type="file" id="mediaUpload" name="media_file" accept="video/*,image/*" class="hidden">
+                        </label>
+                        <div id="fileInfo" class="hidden text-sm text-gray-600 bg-gray-100 p-2 rounded mt-2">
+                            <i class="fas fa-file-alt mr-2"></i>
+                            <span id="fileName"></span>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- URL Input -->
+                <div class="space-y-3">
+                    <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                        <i class="fas fa-link mr-2 text-blue-400"></i> URL de vidéo
+                    </h3>
+                    <div class="flex">
+                        <input type="text" id="videoUrl" placeholder="https://example.com/video.mp4" class="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button id="loadUrl" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r-lg">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Output Section -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                <i class="fas fa-language mr-2 text-blue-500"></i> Résultats de traduction
+            </h2>
+            
+            <div class="space-y-6">
+                <!-- Detection Preview -->
+                <div class="space-y-3">
+                    <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                        <i class="fas fa-eye mr-2 text-blue-400"></i> Aperçu de détection
+                    </h3>
+                    <div class="video-container">
+                        <video id="processedVideo" class="hidden"></video>
+                        <canvas id="outputCanvas" class="hidden"></canvas>
+                        <div class="absolute inset-0 flex items-center justify-center text-white bg-gray-800">
+                            <i class="fas fa-hands text-4xl opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Results -->
+                <div class="space-y-3">
+                    <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                        <i class="fas fa-comment-dots mr-2 text-blue-400"></i> Texte traduit
+                    </h3>
+                    <div class="result-box bg-gray-50 p-4 rounded-lg">
+                        <div id="translationResult" class="text-gray-800">
+                            {% if translation_result %}
+                                <p class="text-lg">{{ translation_result.translated_text }}</p>
+                                <div class="mt-2 text-sm text-gray-600">
+                                    <p>Confiance: {{ translation_result.confidence_score|floatformat:2 }}%</p>
+                                    <p>Temps de traitement: {{ translation_result.processing_time|floatformat:2 }}s</p>
+                                </div>
+                            {% else %}
+                                <div class="text-center text-gray-400 py-8">
+                                    <i class="fas fa-hands-helping text-3xl mb-2"></i>
+                                    <p>Les résultats de traduction apparaîtront ici</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="text-sm text-gray-500">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            <span id="processingStatus">Prêt à traiter</span>
+                        </div>
+                        <button id="copyResults" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 py-1 px-3 rounded flex items-center" disabled>
+                            <i class="fas fa-copy mr-1"></i> Copier
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Controls -->
+                <div class="space-y-3">
+                    <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                        <i class="fas fa-cogs mr-2 text-blue-400"></i> Contrôles
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="startProcessing" class="bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg flex items-center justify-center font-medium">
+                            <i class="fas fa-play-circle mr-2"></i> Démarrer
+                        </button>
+                        <button id="stopProcessing" class="bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-lg flex items-center justify-center font-medium" disabled>
+                            <i class="fas fa-stop-circle mr-2"></i> Arrêter
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between mt-2">
+                        <div class="flex items-center">
+                            <input type="checkbox" id="realTimeMode" class="mr-2" checked>
+                            <label for="realTimeMode" class="text-sm text-gray-700">Mode temps réel</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" id="showLandmarks" class="mr-2" checked>
+                            <label for="showLandmarks" class="text-sm text-gray-700">Afficher les points</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="mt-16 text-center text-gray-500 text-sm">
+        <div class="mb-2">
+            <a href="#" class="mx-2 hover:text-blue-500">À propos</a>
+            <a href="#" class="mx-2 hover:text-blue-500">Documentation</a>
+            <a href="#" class="mx-2 hover:text-blue-500">Contact</a>
+        </div>
+        <p>SignVision AI &copy; 2023 - Projet développé par <span class="font-semibold text-blue-500">Marino ATOHOUN</span></p>
+        <p class="mt-1 text-xs">Cette application utilise des modèles avancés de computer vision pour détecter et traduire le langage des signes.</p>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Configuration CSRF pour Django
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrftoken = getCookie('csrftoken');
+    
+    // Configuration des headers AJAX
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+                xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            }
+        }
+    });
+</script>
+{% endblock %}
+
