@@ -74,6 +74,35 @@ class YOLOv8SignDetector:
         return self._process_results(results)
         
         #return self._simulate_detection(image_path)
+
+    def _process_results(self, results) -> List[Dict]:
+        """
+        Transforme les résultats du modèle YOLOv8 en liste de détections au format attendu
+        """
+        detections = []
+        # results.boxes.xyxy, results.boxes.conf, results.boxes.cls
+        # On suppose que results est un objet ultralytics YOLO avec .boxes
+        if hasattr(results, 'boxes'):
+            boxes = results.boxes
+            for i in range(len(boxes)):
+                # Extraction des coordonnées et scores
+                xyxy = boxes.xyxy[i].tolist() if hasattr(boxes.xyxy[i], 'tolist') else list(boxes.xyxy[i])
+                conf = float(boxes.conf[i]) if hasattr(boxes.conf[i], 'item') else boxes.conf[i]
+                cls_idx = int(boxes.cls[i]) if hasattr(boxes.cls[i], 'item') else boxes.cls[i]
+                sign_class = self.sign_classes[cls_idx] if cls_idx < len(self.sign_classes) else str(cls_idx)
+                detection = {
+                    'class': sign_class,
+                    'confidence': conf,
+                    'bbox': {
+                        'x': xyxy[0],
+                        'y': xyxy[1],
+                        'width': xyxy[2] - xyxy[0],
+                        'height': xyxy[3] - xyxy[1]
+                    },
+                    'frame': 0
+                }
+                detections.append(detection)
+        return detections
     
     def detect_signs_video(self, video_path: str) -> List[Dict]:
         """
